@@ -1,6 +1,6 @@
 # ==============================================================================
 # File: .github/workflows/mirror-octopus-images.yml
-# Purpose: Pulls public Octopus images and pushes them to their respective ECR repos
+# Purpose: Pulls public Octopus images & Helm chart and pushes them to ECR
 # ==============================================================================
 
 name: Mirror Octopus Images to Private ECR
@@ -23,6 +23,9 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
       - name: Pull, Tag, and Push Octopus Agent Tentacle Image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -38,3 +41,19 @@ jobs:
           docker pull octopusdeploy/kubernetes-agent-tools-base:1.29
           docker tag octopusdeploy/kubernetes-agent-tools-base:1.29 $REGISTRY/octopusdeploy/kubernetes-agent-tools-base:1.29
           docker push $REGISTRY/octopusdeploy/kubernetes-agent-tools-base:1.29
+
+      - name: Pull, Tag, and Push Octopus Kubernetes Monitor Image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker pull octopusdeploy/kubernetes-monitor:v0.32.2
+          docker tag octopusdeploy/kubernetes-monitor:v0.32.2 $REGISTRY/octopusdeploy/kubernetes-monitor:v0.32.2
+          docker push $REGISTRY/octopusdeploy/kubernetes-monitor:v0.32.2
+
+      - name: Pull and Push Octopus Kubernetes Agent Helm Chart (3.15.7)
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          aws ecr get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin $REGISTRY
+          helm pull oci://registry-1.docker.io/octopusdeploy/kubernetes-agent --version 3.15.7
+          helm push kubernetes-agent-3.15.7.tgz oci://$REGISTRY/octopusdeploy
